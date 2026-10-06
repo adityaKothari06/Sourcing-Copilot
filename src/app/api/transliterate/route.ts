@@ -31,10 +31,19 @@ Return ONLY the Hinglish text with no quotes, preamble or formatting:
 ${text}
 """`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-        });
+        let response;
+        try {
+          response = await ai.models.generateContent({
+            model: 'gemini-3.5-flash-lite',
+            contents: prompt,
+          });
+        } catch (err) {
+          console.warn('gemini-3.5-flash-lite failed, trying gemini-3.5-flash:', err);
+          response = await ai.models.generateContent({
+            model: 'gemini-3.5-flash',
+            contents: prompt,
+          });
+        }
 
         let output = response.text?.trim() || devanagariToHinglish(text);
         output = output

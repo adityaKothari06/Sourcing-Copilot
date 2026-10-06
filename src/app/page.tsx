@@ -53,6 +53,7 @@ export default function SourcingCopilotPage() {
   const [history, setHistory] = useState<SourcingPosition[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [activeTab, setActiveTab] = useState<PortalType>('naukri');
+  const [candidatePoolMode, setCandidatePoolMode] = useState<'all' | 'ex_employees' | 'freshers'>('all');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [feedbackNotification, setFeedbackNotification] = useState<string | null>(null);
 
@@ -63,7 +64,17 @@ export default function SourcingCopilotPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const baseTextRef = useRef('');
-  const finalTranscriptRef = useRef('');
+  const latestTextRef = useRef('');
+
+  // Remove accidental speech engine phrase repetition / stutter
+  const cleanDuplicatedPhrases = (text: string): string => {
+    if (!text) return '';
+    // Collapse immediate duplicate single words: "Candidate Candidate" -> "Candidate"
+    let cleaned = text.replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1');
+    // Collapse repeated 2-6 word sequences (e.g. "Candidate chahiye Candidate chahiye")
+    cleaned = cleaned.replace(/\b((?:[\w\d.-]+\s+){1,5}[\w\d.-]+)\s+\1\b/gi, '$1');
+    return cleaned;
+  };
 
   // Filter for keyword matrix
   const [keywordCategoryFilter, setKeywordCategoryFilter] = useState<string>('all');
@@ -89,18 +100,23 @@ export default function SourcingCopilotPage() {
   }
 
   // Handle explicit transliteration / translation of text
-  const handleTransliterateText = async (targetMode: 'hinglish' | 'english' = 'hinglish') => {
-    if (!inputText.trim()) return;
+  const handleTransliterateText = async (
+    targetMode: 'hinglish' | 'english' = 'hinglish',
+    explicitText?: string
+  ) => {
+    const textToProcess = (explicitText !== undefined ? explicitText : latestTextRef.current || inputText).trim();
+    if (!textToProcess) return;
     setIsTransliterating(true);
     try {
       const res = await fetch('/api/transliterate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: inputText, target: targetMode }),
+        body: JSON.stringify({ text: textToProcess, target: targetMode }),
       });
       const data = await res.json();
       if (data?.text) {
         setInputText(data.text);
+        latestTextRef.current = data.text;
         notifyFeedback(
           targetMode === 'english'
             ? '🌐 Translated to English!'
@@ -109,7 +125,9 @@ export default function SourcingCopilotPage() {
       }
     } catch (err) {
       console.warn('Transliterate API failed, using client engine:', err);
-      setInputText(devanagariToHinglish(inputText));
+      const fallbackConverted = devanagariToHinglish(textToProcess);
+      setInputText(fallbackConverted);
+      latestTextRef.current = fallbackConverted;
       notifyFeedback('✨ Converted to Hinglish!');
     } finally {
       setIsTransliterating(false);
@@ -172,35 +190,43 @@ export default function SourcingCopilotPage() {
       recognition.lang = 'hi-IN';
 
       // Capture pre-existing text so new speech appends cleanly without overwriting or duplicating
-      baseTextRef.current = inputText.trim() ? `${inputText.trim()} ` : '';
-      finalTranscriptRef.current = '';
+      const existing = (latestTextRef.current || inputText).trim();
+      baseTextRef.current = existing ? `${existing} ` : '';
+      latestTextRef.current = existing;
 
       recognition.onstart = () => {
         setIsRecording(true);
         setInputType('voice');
       };
 
-      // FIXED: Correctly separate final confirmed speech vs interim hypothesis to prevent sentence duplication!
+      // FIXED: Build session transcript locally from event.results on each tick.
+      // This eliminates the Mobile Chrome/Android bug where resultIndex resets to 0 and duplicates prior words!
       recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscriptRef.current += `${result[0].transcript.trim()} `;
+        let sessionFinal = '';
+        let sessionInterim = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          const part = res[0]?.transcript || '';
+          if (res.isFinal) {
+            sessionFinal += (sessionFinal ? ' ' : '') + part.trim();
           } else {
-            interimTranscript += result[0].transcript;
+            sessionInterim += (sessionInterim ? ' ' : '') + part.trim();
           }
         }
 
-        const rawSpokenSentence = (finalTranscriptRef.current + interimTranscript).trim();
+        const rawSpokenSentence = (sessionFinal + (sessionInterim ? ' ' + sessionInterim : '')).trim();
+        const deduplicatedSentence = cleanDuplicatedPhrases(rawSpokenSentence);
 
         // If user wants Hinglish, convert Devanagari in real-time
         const formattedSentence =
           speechOutputMode === 'hinglish'
-            ? devanagariToHinglish(rawSpokenSentence)
-            : rawSpokenSentence;
+            ? devanagariToHinglish(deduplicatedSentence)
+            : deduplicatedSentence;
 
-        setInputText((baseTextRef.current + formattedSentence).trim());
+        const newText = (baseTextRef.current + formattedSentence).trim();
+        latestTextRef.current = newText;
+        setInputText(newText);
       };
 
       recognition.onerror = (event: any) => {
@@ -220,9 +246,10 @@ export default function SourcingCopilotPage() {
 
       recognition.onend = () => {
         setIsRecording(false);
+        const currentText = latestTextRef.current.trim();
         // Polish Hinglish or English output when dictation concludes
-        if (speechOutputMode === 'hinglish' || speechOutputMode === 'english') {
-          handleTransliterateText(speechOutputMode);
+        if (currentText && (speechOutputMode === 'hinglish' || speechOutputMode === 'english')) {
+          handleTransliterateText(speechOutputMode, currentText);
         }
       };
 
@@ -486,7 +513,10 @@ export default function SourcingCopilotPage() {
             <div className="relative">
               <textarea
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                onChange={(e) => {
+                  setInputText(e.target.value);
+                  latestTextRef.current = e.target.value;
+                }}
                 placeholder="Speak or paste here... E.g. 'Client ko Maharashtra ke liye Area Sales Manager chahiye, 5-8 yrs, Rotavator & MB Plough background from Shaktiman or Lemken...'"
                 rows={6}
                 className="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3.5 pb-12 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all resize-y"
@@ -512,7 +542,10 @@ export default function SourcingCopilotPage() {
                   {inputText.trim() && (
                     <button
                       type="button"
-                      onClick={() => setInputText('')}
+                      onClick={() => {
+                        setInputText('');
+                        latestTextRef.current = '';
+                      }}
                       className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-red-950/80 text-slate-400 hover:text-red-400 border border-slate-700 text-xs transition-colors cursor-pointer"
                       title="Clear text"
                     >
@@ -552,6 +585,7 @@ export default function SourcingCopilotPage() {
                     type="button"
                     onClick={() => {
                       setInputText(sc.text);
+                      latestTextRef.current = sc.text;
                       setInputType('text');
                     }}
                     className="text-[11px] text-left px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-700 border border-slate-700/60 text-slate-300 transition-colors"
@@ -602,10 +636,22 @@ export default function SourcingCopilotPage() {
 
         {/* Right Column: Sourcing Strategy & Portal Strings (7 cols on lg) */}
         <div className="lg:col-span-7 space-y-5">
-          {activePosition ? (
+          {loading ? (
+            <div className="bg-slate-800/90 border border-amber-500/30 rounded-2xl p-8 text-center space-y-4 shadow-lg animate-pulse">
+              <div className="inline-flex p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <Tractor className="w-8 h-8 animate-bounce" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white">Synthesizing Domain Requirements...</h3>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Extracting target equipment, competitor OEMs, regional hubs, and generating Boolean queries for Naukri, LinkedIn, and Google X-Ray.
+                </p>
+              </div>
+            </div>
+          ) : activePosition ? (
             <>
               {/* Role Intelligence Summary Banner */}
-              <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-sm">
+              <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-700/80">
                   <div>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full border border-amber-400/20">
@@ -616,49 +662,91 @@ export default function SourcingCopilotPage() {
                     </h1>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs bg-slate-900 px-3 py-1 rounded-lg border border-slate-700 text-slate-300 font-medium">
-                      🎯 {activePosition.parsed.experienceYears.min}-{activePosition.parsed.experienceYears.max} Years Exp
+                      🎯 {(() => {
+                        const min = Math.min(activePosition.parsed.experienceYears.min, activePosition.parsed.experienceYears.max);
+                        const max = Math.max(activePosition.parsed.experienceYears.min, activePosition.parsed.experienceYears.max);
+                        return min === max ? `${min}+ Years Exp` : `${min}-${max} Years Exp`;
+                      })()}
                     </span>
                     {activePosition.parsed.locations.length > 0 && (
                       <span className="text-xs bg-slate-900 px-3 py-1 rounded-lg border border-slate-700 text-slate-300 font-medium flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-red-400" />
-                        {activePosition.parsed.locations.slice(0, 2).join(', ')}
+                        {activePosition.parsed.locations.slice(0, 3).join(', ')}
                       </span>
                     )}
+                    {activePosition.parsed.qualification && (
+                      <span className="text-xs bg-slate-900 px-3 py-1 rounded-lg border border-slate-700 text-amber-300 font-medium flex items-center gap-1">
+                        🎓 {activePosition.parsed.qualification}
+                      </span>
+                    )}
+                    <span className="text-xs bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700 text-slate-400 font-medium capitalize">
+                      💼 {activePosition.parsed.seniorityLevel} Level
+                    </span>
                   </div>
                 </div>
 
-                {/* Key Attributes Pills */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs">
-                  <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/60">
-                    <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1 mb-1">
+                {/* Key Attributes Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+                  {/* Equipment Focus */}
+                  <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-2">
+                    <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
                       <Layers className="w-3.5 h-3.5 text-blue-400" />
-                      Target Equipment / Implements:
+                      Target Equipment / Implements Focus:
                     </span>
-                    <p className="font-semibold text-slate-200">
-                      {activePosition.parsed.equipmentFocus.join(', ') || 'Agricultural Machinery'}
-                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {activePosition.parsed.equipmentFocus.map((eq, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-md bg-blue-950/70 border border-blue-800/50 text-blue-200 text-[11px] font-medium"
+                        >
+                          {eq}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/60">
-                    <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1 mb-1">
-                      <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                      Target Competitor OEMs to Poach:
-                    </span>
-                    <p className="font-semibold text-slate-200">
-                      {activePosition.parsed.targetCompanies.slice(0, 5).join(', ')}
-                    </p>
+                  {/* Competitor OEMs */}
+                  <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                        Target Competitor OEMs to Poach:
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">
+                        {activePosition.parsed.targetCompanies.length} Indian OEMs
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                      {activePosition.parsed.targetCompanies.map((comp, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-md bg-emerald-950/70 border border-emerald-800/50 text-emerald-200 text-[11px] font-medium"
+                        >
+                          {comp}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                {/* Adjacent Talent Pools Advice */}
-                {activePosition.parsed.adjacentTalentPools.length > 0 && (
-                  <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold">Niche Talent Shortage Backup: </span>
-                      <span>If implement talent is scarce in this region, poach from: {activePosition.parsed.adjacentTalentPools.join('; ')}</span>
+                {/* Alternative Designations Targeted */}
+                {activePosition.parsed.standardTitles.length > 0 && (
+                  <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-700/40 text-xs space-y-1.5">
+                    <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                      <Briefcase className="w-3.5 h-3.5 text-amber-400" />
+                      Alternative Job Titles Included in Search:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {activePosition.parsed.standardTitles.map((st, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 text-[11px]"
+                        >
+                          {st}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -713,145 +801,261 @@ export default function SourcingCopilotPage() {
                   </button>
                 </div>
 
+                {/* Sourcing Candidate Pool Filter Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 px-5 py-3 bg-slate-900/90 border-b border-slate-700/80">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
+                    <span>Target Candidate Pool:</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCandidatePoolMode('all')}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        candidatePoolMode === 'all'
+                          ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                          : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700/60'
+                      }`}
+                    >
+                      🎯 All Lateral / Employed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCandidatePoolMode('ex_employees')}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        candidatePoolMode === 'ex_employees'
+                          ? 'bg-emerald-500 text-slate-950 font-bold shadow-xs'
+                          : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700/60'
+                      }`}
+                      title="Candidates who left their job, serving notice period, or immediate joiners"
+                    >
+                      ⚡ Left Job / Notice Period
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCandidatePoolMode('freshers')}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        candidatePoolMode === 'freshers'
+                          ? 'bg-indigo-500 text-white font-bold shadow-xs'
+                          : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700/60'
+                      }`}
+                      title="Freshers, GET, MT, and Trainee engineers"
+                    >
+                      🌱 Freshers & Trainees
+                    </button>
+                  </div>
+                </div>
+
                 {/* Tab Content Panels */}
                 <div className="p-5">
                   {/* NAUKRI TAB */}
-                  {activeTab === 'naukri' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-bold text-white">Naukri Resdex Boolean Query</h3>
-                          <p className="text-xs text-slate-400">Copy and paste directly into Naukri Keywords search box</p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(activePosition.queries.naukri.booleanQuery, 'naukri_bool')}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          {copiedKey === 'naukri_bool' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedKey === 'naukri_bool' ? 'Copied!' : 'Copy Boolean'}</span>
-                        </button>
-                      </div>
+                  {activeTab === 'naukri' && (() => {
+                    const activeNaukriQuery = candidatePoolMode === 'ex_employees'
+                      ? (activePosition.queries.naukri.exEmployeeQuery || activePosition.queries.naukri.booleanQuery)
+                      : candidatePoolMode === 'freshers'
+                      ? (activePosition.queries.naukri.fresherQuery || activePosition.queries.naukri.booleanQuery)
+                      : activePosition.queries.naukri.booleanQuery;
 
-                      <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-700 font-mono text-xs text-blue-200 leading-relaxed break-all select-all">
-                        {activePosition.queries.naukri.booleanQuery}
-                      </div>
-
-                      {/* Sub-fields for Resdex filters */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                        <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/70">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="font-semibold text-slate-300">Designation Filter:</span>
-                            <button
-                              onClick={() => copyToClipboard(activePosition.queries.naukri.designationSearch, 'naukri_desig')}
-                              className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                            >
-                              {copiedKey === 'naukri_desig' ? 'Copied' : 'Copy'}
-                            </button>
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-white">Naukri Resdex Boolean Query</h3>
+                              {candidatePoolMode === 'ex_employees' && (
+                                <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded font-semibold">
+                                  ⚡ Left Job / Immediate Joiners
+                                </span>
+                              )}
+                              {candidatePoolMode === 'freshers' && (
+                                <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800/60 px-2 py-0.5 rounded font-semibold">
+                                  🌱 Freshers & Trainees
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400">Copy and paste directly into Naukri Keywords search box</p>
                           </div>
-                          <p className="font-mono text-slate-400">{activePosition.queries.naukri.designationSearch}</p>
+                          <button
+                            onClick={() => copyToClipboard(activeNaukriQuery, 'naukri_bool')}
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            {copiedKey === 'naukri_bool' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedKey === 'naukri_bool' ? 'Copied!' : 'Copy Boolean'}</span>
+                          </button>
                         </div>
 
-                        <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/70">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="font-semibold text-slate-300">Exclude Keywords (NOT):</span>
-                            <button
-                              onClick={() => copyToClipboard(activePosition.queries.naukri.excludeTerms.join(' OR '), 'naukri_excl')}
-                              className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                            >
-                              {copiedKey === 'naukri_excl' ? 'Copied' : 'Copy'}
-                            </button>
+                        <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-700 font-mono text-xs text-blue-200 leading-relaxed break-all select-all">
+                          {activeNaukriQuery}
+                        </div>
+
+                        {/* Sub-fields for Resdex filters */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/70">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-semibold text-slate-300">Designation Filter:</span>
+                              <button
+                                onClick={() => copyToClipboard(activePosition.queries.naukri.designationSearch, 'naukri_desig')}
+                                className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                              >
+                                {copiedKey === 'naukri_desig' ? 'Copied' : 'Copy'}
+                              </button>
+                            </div>
+                            <p className="font-mono text-slate-400">{activePosition.queries.naukri.designationSearch}</p>
                           </div>
-                          <p className="font-mono text-slate-400">{activePosition.queries.naukri.excludeTerms.join(', ')}</p>
+
+                          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/70">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-semibold text-slate-300">Exclude Keywords (NOT):</span>
+                              <button
+                                onClick={() => copyToClipboard(activePosition.queries.naukri.excludeTerms.join(' OR '), 'naukri_excl')}
+                                className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                              >
+                                {copiedKey === 'naukri_excl' ? 'Copied' : 'Copy'}
+                              </button>
+                            </div>
+                            <p className="font-mono text-slate-400">{activePosition.queries.naukri.excludeTerms.join(', ')}</p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-between">
+                          <a
+                            href="https://resdex.naukri.com/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold"
+                          >
+                            <span>Open Naukri Resdex in new tab</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
                         </div>
                       </div>
-
-                      <div className="pt-2 flex items-center justify-between">
-                        <a
-                          href="https://resdex.naukri.com/"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold"
-                        >
-                          <span>Open Naukri Resdex in new tab</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* GOOGLE X-RAY TAB */}
-                  {activeTab === 'google_xray' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-bold text-white">Google X-Ray Candidate Sourcing</h3>
-                          <p className="text-xs text-slate-400">Zero cost. Discovers indexed candidate profiles across the open web.</p>
+                  {activeTab === 'google_xray' && (() => {
+                    const activeXrayQuery = candidatePoolMode === 'ex_employees'
+                      ? (activePosition.queries.googleXray.exEmployeeQuery || activePosition.queries.googleXray.searchQuery)
+                      : candidatePoolMode === 'freshers'
+                      ? (activePosition.queries.googleXray.fresherQuery || activePosition.queries.googleXray.searchQuery)
+                      : activePosition.queries.googleXray.searchQuery;
+
+                    const activeXrayUrl = candidatePoolMode === 'ex_employees'
+                      ? (activePosition.queries.googleXray.exEmployeeUrl || activePosition.queries.googleXray.directUrl)
+                      : candidatePoolMode === 'freshers'
+                      ? (activePosition.queries.googleXray.fresherUrl || activePosition.queries.googleXray.directUrl)
+                      : activePosition.queries.googleXray.directUrl;
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-white">Google X-Ray Candidate Sourcing</h3>
+                              {candidatePoolMode === 'ex_employees' && (
+                                <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded font-semibold">
+                                  ⚡ Ex-Employees & Left Job
+                                </span>
+                              )}
+                              {candidatePoolMode === 'freshers' && (
+                                <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800/60 px-2 py-0.5 rounded font-semibold">
+                                  🌱 Freshers & Trainees
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400">Zero cost. Discovers indexed candidate profiles across the open web.</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => copyToClipboard(activeXrayQuery, 'xray_query')}
+                              className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              {copiedKey === 'xray_query' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedKey === 'xray_query' ? 'Copied' : 'Copy Query'}</span>
+                            </button>
+
+                            <a
+                              href={activeXrayUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/20"
+                            >
+                              <span>Launch Google Search Now</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => copyToClipboard(activePosition.queries.googleXray.searchQuery, 'xray_query')}
-                            className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            {copiedKey === 'xray_query' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedKey === 'xray_query' ? 'Copied' : 'Copy Query'}</span>
-                          </button>
 
-                          <a
-                            href={activePosition.queries.googleXray.directUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/20"
-                          >
-                            <span>Launch Google Search Now</span>
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
+                        <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-700 font-mono text-xs text-amber-200 leading-relaxed break-all select-all">
+                          {activeXrayQuery}
+                        </div>
+
+                        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-700/60 text-xs text-slate-300">
+                          💡 <strong>Pro Recruiter Tip:</strong> Clicking &quot;Launch Google Search Now&quot; searches Google specifically for candidate profiles in Indian Tractor & Implement OEMs. You can view their full experience and reach out on LinkedIn for free without needing a paid Recruiter license.
                         </div>
                       </div>
-
-                      <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-700 font-mono text-xs text-amber-200 leading-relaxed break-all select-all">
-                        {activePosition.queries.googleXray.searchQuery}
-                      </div>
-
-                      <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-700/60 text-xs text-slate-300">
-                        💡 <strong>Pro Recruiter Tip:</strong> Clicking &quot;Launch Google Search Now&quot; searches Google specifically for candidate profiles working on tractors and implements. You can view their full experience, phone/email hints, and connect on LinkedIn for free without needing a ₹5,000/mo Recruiter Lite subscription.
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* LINKEDIN TAB */}
-                  {activeTab === 'linkedin' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-bold text-white">LinkedIn People Search</h3>
-                          <p className="text-xs text-slate-400">Targeted title and equipment query for LinkedIn People search</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => copyToClipboard(activePosition.queries.linkedin.booleanQuery, 'li_query')}
-                            className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            {copiedKey === 'li_query' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedKey === 'li_query' ? 'Copied' : 'Copy'}</span>
-                          </button>
+                  {activeTab === 'linkedin' && (() => {
+                    const activeLiQuery = candidatePoolMode === 'ex_employees'
+                      ? (activePosition.queries.linkedin.exEmployeeQuery || activePosition.queries.linkedin.booleanQuery)
+                      : candidatePoolMode === 'freshers'
+                      ? (activePosition.queries.linkedin.fresherQuery || activePosition.queries.linkedin.booleanQuery)
+                      : activePosition.queries.linkedin.booleanQuery;
 
-                          <a
-                            href={activePosition.queries.linkedin.searchUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20"
-                          >
-                            <span>Open in LinkedIn</span>
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
+                    const activeLiUrl = candidatePoolMode === 'ex_employees'
+                      ? (activePosition.queries.linkedin.exEmployeeSearchUrl || activePosition.queries.linkedin.searchUrl)
+                      : candidatePoolMode === 'freshers'
+                      ? (activePosition.queries.linkedin.fresherSearchUrl || activePosition.queries.linkedin.searchUrl)
+                      : activePosition.queries.linkedin.searchUrl;
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-white">LinkedIn People Search</h3>
+                              {candidatePoolMode === 'ex_employees' && (
+                                <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded font-semibold">
+                                  ⚡ Ex-Employees & Notice Period
+                                </span>
+                              )}
+                              {candidatePoolMode === 'freshers' && (
+                                <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800/60 px-2 py-0.5 rounded font-semibold">
+                                  🌱 Freshers & Trainees
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400">Targeted title, equipment, and OEM query for LinkedIn People search</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => copyToClipboard(activeLiQuery, 'li_query')}
+                              className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              {copiedKey === 'li_query' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedKey === 'li_query' ? 'Copied' : 'Copy'}</span>
+                            </button>
+
+                            <a
+                              href={activeLiUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20"
+                            >
+                              <span>Open in LinkedIn</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-700 font-mono text-xs text-indigo-200 leading-relaxed break-all select-all">
+                          {activeLiQuery}
                         </div>
                       </div>
-
-                      <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-700 font-mono text-xs text-indigo-200 leading-relaxed break-all select-all">
-                        {activePosition.queries.linkedin.booleanQuery}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* REFERRAL / WHATSAPP TAB */}
                   {activeTab === 'referral' && (

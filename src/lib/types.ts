@@ -12,6 +12,8 @@ export interface KeywordItem {
 export interface GeneratedQueries {
   naukri: {
     booleanQuery: string;
+    exEmployeeQuery?: string;
+    fresherQuery?: string;
     designationSearch: string;
     mandatorySkills: string[];
     excludeTerms: string[];
@@ -19,13 +21,21 @@ export interface GeneratedQueries {
   };
   linkedin: {
     booleanQuery: string;
+    exEmployeeQuery?: string;
+    fresherQuery?: string;
     titleKeywords: string[];
     skillKeywords: string[];
     searchUrl: string;
+    exEmployeeSearchUrl?: string;
+    fresherSearchUrl?: string;
   };
   googleXray: {
     searchQuery: string;
+    exEmployeeQuery?: string;
+    fresherQuery?: string;
     directUrl: string;
+    exEmployeeUrl?: string;
+    fresherUrl?: string;
     explanation: string;
   };
   referral: {
@@ -45,6 +55,7 @@ export interface ParsedPosition {
   adjacentTalentPools: string[];
   coreCompetencies: string[];
   exclusions: string[];
+  qualification?: string;
 }
 
 export interface SourcingPosition {
