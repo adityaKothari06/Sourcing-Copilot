@@ -74,35 +74,45 @@ ${rawInput}
 """
 
 Domain & Extraction Rules:
-1. Candidate Role & Function:
-   - Accurately determine the exact functional area (Sales, HR / Talent Acquisition, Customer Service / Technical Support, Plant Operations, Quality, Engineering, Supply Chain, Finance, etc.).
-   - If the brief mentions "sales hr", "hr", "recruiter", "talent acquisition", or "hrbp", the title MUST be Human Resources / Talent Acquisition (e.g. "HR Business Partner - Sales", "Sales HR Manager", "Talent Acquisition Specialist - Sales"), NOT a Sales Manager!
-   - If the candidate is expected to handle an entire territory or region (e.g., "pura northeast dekh sake", "state head"), assign a Regional/Zonal title (e.g. "Regional Sales Manager", "Zonal Head") and seniority "senior".
-2. Indian Geography & Regional Hubs:
-   - If "northeast" or "north east" is mentioned, target locations MUST include North East India, Assam, Guwahati, Meghalaya, etc. DO NOT confuse North East with North India (Punjab/Haryana).
-   - If "maharashtra" / "maharastra" is mentioned, target locations MUST include Maharashtra, Pune, Mumbai, Nashik, Nagpur, Aurangabad.
-   - For other regions: North (Punjab, Ludhiana, Haryana, UP, Delhi NCR), South (Karnataka, Bengaluru, AP, Telangana, Tamil Nadu), East (West Bengal, Kolkata, Bihar, Odisha), Central (MP, Indore, Chhattisgarh).
+1. Candidate Role & Recruiter Shorthand:
+   - Accurately determine the exact functional area (Sales, HR, Customer Service, Plant, Quality, Engineering, Supply Chain, Finance).
+   - "BBT" / "bbt" / "b.tech" / "be": In Indian recruiter speech/notes, "BBT" refers to **BE / B.Tech (Engineering Graduate)** (Mechanical or Agricultural Engineering).
+   - If the brief mentions "sales hr", "hr", "recruiter", "talent acquisition", or "hrbp", the role MUST be Human Resources / Talent Acquisition, NOT a Sales Manager!
+2. Regional Market Realities & Realistic Designations:
+   - **North East India Market Context**:
+     - Real market titles: "State Head - Assam & North East", "Area Sales Manager (ASM) - North East", "Regional Sales Manager (RSM)", "Territory Manager". (NEVER use unrealistic corporate designations like "Business Head - North East" or "Regional Head - Sales" which do not exist in NE agri-machinery).
+     - Dominant machinery in NE: North East agriculture is predominantly hilly, terrace, and paddy small holdings. Dominant equipment is **Power Tillers, Rotavators, Weeders, Paddy Harvesters, Reapers, and Mini Tractors**.
+     - Top OEMs in NE: **VST Tillers Tractors, Shaktiman, Fieldking, KisanKraft, Kamco, Sonalika, Mahindra Farm Equipment, Honda Power Products**.
+     - Crucial skills: **SMAM DBT Government Subsidies, State Agriculture Directorate tender billing, Dealer Network across Assam and 7 Sisters, Farmer Field Demonstrations**.
+     - Hubs: Guwahati, Siliguri, Assam.
+   - **North India (Punjab / Haryana / Western UP)**:
+     - Real titles: "Zonal Sales Manager", "Regional Sales Manager", "Area Sales Manager".
+     - Dominant machinery: Combine Harvesters, Round Balers, Straw Reapers, Laser Land Levelers, Super Seeders, Heavy Tractors.
+     - Top OEMs: Claas, Preet, Dasmesh, KS Agrotech, Kartar, Shaktiman, Fieldking, New Holland, Mahindra.
+   - **West India (Maharashtra / Gujarat)**:
+     - Dominant machinery: Sugarcane Harvesters, Orchard Boom Sprayers (Mitra, ASPEE), MB Plough, Rotavator, Reversible Plough.
+     - Top OEMs: Mitra Sprayers, ASPEE, Lemken, Maschio Gaspardo, Shaktiman, Mahindra, Swaraj.
+   - **South India (Karnataka / AP / Telangana / Tamil Nadu)**:
+     - Dominant machinery: Power Tillers, Paddy Transplanters, Weeders, Mini Tractors, Sprayers.
+     - Top OEMs: VST Tillers, Kamco, KisanKraft, TAFE, Kubota, Yanmar.
 3. Experience & Qualification:
    - Accurately parse min and max years (e.g. 5-10 -> min: 5, max: 10; 8+ -> min: 8, max: 12). Min must ALWAYS be <= max.
-   - If BE / B.Tech / Diploma / MBA etc. is mentioned, specify in qualification.
-4. Domain Focus & Companies:
-   - If implements or tractors are mentioned, include implement OEMs (Shaktiman, Fieldking, Lemken, Maschio Gaspardo, Mahindra, TAFE, Sonalika, Escorts Kubota, John Deere) and equipment focus (Rotavator, MB Plough, etc.).
-   - If an HR role or general corporate role is specified, target companies should be leading manufacturing/automotive/engineering companies with sales forces, and equipmentFocus should be relevant focus areas (or empty array [] if not applicable).
-5. Historical Learned Feedback:
-   - High-performing keywords in this domain: [${topUpvoted || 'Rotavator, Shaktiman, Dealer Network, Area Sales Manager'}]
+   - If BE / B.Tech / BBT / Diploma / MBA is mentioned, specify in qualification.
+4. Historical Learned Feedback:
+   - High-performing keywords: [${topUpvoted || 'Rotavator, Power Tiller, Shaktiman, VST, Dealer Network, Area Sales Manager'}]
    - Poor/irrelevant keywords to suppress: [${topDownvoted || 'Java, Python, Software Developer, Modern Trade'}]
 
 Return a strictly valid JSON object matching this schema:
 {
-  "title": string (Clear job title e.g. "Regional Sales Manager - Farm Implements" or "HR Business Partner - Sales"),
-  "standardTitles": string[] (Alternative designations used across companies e.g. ["Territory Manager", "ASM", "Territory In-charge"] or ["Sales HR Manager", "HRBP", "Talent Acquisition Partner"]),
+  "title": string (Realistic job title e.g. "State Head - Farm Implements & Machinery" or "Regional Sales Manager - Farm Implements" or "HR Business Partner - Sales"),
+  "standardTitles": string[] (Realistic designations used in that market e.g. ["State Head", "Area Sales Manager", "ASM", "Regional Sales Manager", "Territory Manager"]),
   "seniorityLevel": string ("junior" | "mid" | "senior" | "leadership"),
   "experienceYears": { "min": number, "max": number },
-  "locations": string[] (Target cities, regions or states e.g. ["North East India", "Assam", "Guwahati"]),
-  "equipmentFocus": string[] (Key products/equipment/divisions or domain focus; empty array [] if purely corporate/HR),
-  "targetCompanies": string[] (Target companies/OEMs to poach from),
+  "locations": string[] (Target cities, regions or states e.g. ["Guwahati", "Assam", "Siliguri", "North East India"]),
+  "equipmentFocus": string[] (Regional equipment keywords e.g. ["Power Tiller", "Rotavator", "Farm Implements", "Weeder"]; empty [] if non-equipment/HR),
+  "targetCompanies": string[] (Competitor OEMs to poach from in that market e.g. ["VST Tillers", "Shaktiman", "Fieldking", "KisanKraft", "Mahindra", "Sonalika"]),
   "adjacentTalentPools": string[],
-  "coreCompetencies": string[],
+  "coreCompetencies": string[] (e.g. ["SMAM DBT Subsidy", "Dealer Network Management", "Channel Sales", "Field Demonstration"]),
   "exclusions": string[],
   "qualification": string
 }`;
@@ -146,31 +156,14 @@ function heuristicDomainParser(
   const isService = /\b(service|technical|mechanic|customer support|cse|technician)\b/i.test(lower);
   const isOperations = /\b(plant|operations|production|manufacturing|quality|qa|qc|shop floor)\b/i.test(lower);
 
-  // 1. Detect Equipment / Focus
-  const detectedEquipment: string[] = [];
-  for (const cat of TRACTOR_IMPLEMENTS_KNOWLEDGE.equipmentCategories) {
-    if (cat.synonyms.some((syn) => lower.includes(syn.toLowerCase()))) {
-      detectedEquipment.push(cat.name.split('/')[0].trim());
-      detectedEquipment.push(...cat.synonyms.slice(0, 2));
-    }
-  }
-  if (detectedEquipment.length === 0) {
-    if (lower.includes('implement')) {
-      detectedEquipment.push('Farm Implements', 'Tractor Implements', 'Tillage Equipment', 'Rotavator');
-    } else if (lower.includes('tractor')) {
-      detectedEquipment.push('Tractor', 'Farm Equipment');
-    } else if (!isHR && !isOperations) {
-      detectedEquipment.push('Farm Implements', 'Rotavator', 'MB Plough');
-    }
-  }
 
   // 2. Detect Locations & Regions (word boundary & prefix safe)
   const detectedLocations: string[] = [];
   const isNorthEast = lower.includes('northeast') || lower.includes('north east') || lower.includes('north-east') || lower.includes('assam') || lower.includes('guwahati');
 
   for (const region of TRACTOR_IMPLEMENTS_KNOWLEDGE.indianAgriStatesAndHubs) {
-    // If requirement asks for Northeast, do NOT let North India match
-    if (region.region === 'North India' && isNorthEast) {
+    // If requirement asks for Northeast, do NOT let North India or East India falsely match
+    if ((region.region === 'North India' || region.region === 'East India') && isNorthEast) {
       continue;
     }
 
@@ -206,17 +199,51 @@ function heuristicDomainParser(
     detectedLocations.push('Maharashtra', 'Pune', 'Mumbai');
   }
 
-  // 3. Detect Title & Seniority
-  let detectedTitle = 'Territory Sales Manager';
-  let matchedTitles: string[] = ['Territory Manager', 'Area Sales Manager', 'ASM', 'Territory In-charge'];
+  // Dynamically resolve matching agro-economic region data
+  const matchedRegion = TRACTOR_IMPLEMENTS_KNOWLEDGE.indianAgriStatesAndHubs.find((r) =>
+    detectedLocations.some((loc) =>
+      loc.toLowerCase() === r.region.toLowerCase() ||
+      r.states.some((s) => s.toLowerCase() === loc.toLowerCase()) ||
+      r.majorHubs.some((h) => h.toLowerCase() === loc.toLowerCase())
+    )
+  );
+
+  // 1. Detect Equipment / Focus (context-driven)
+  const detectedEquipment: string[] = [];
+  for (const cat of TRACTOR_IMPLEMENTS_KNOWLEDGE.equipmentCategories) {
+    if (cat.synonyms.some((syn) => lower.includes(syn.toLowerCase()))) {
+      detectedEquipment.push(cat.name.split('/')[0].trim());
+      detectedEquipment.push(...cat.synonyms.slice(0, 2));
+    }
+  }
+
+  if (detectedEquipment.length === 0) {
+    if (matchedRegion?.dominantEquipment && !isHR && !isOperations) {
+      detectedEquipment.push(...matchedRegion.dominantEquipment.slice(0, 3));
+    } else if (lower.includes('implement')) {
+      detectedEquipment.push('Farm Implements', 'Tractor Implements', 'Tillage Equipment', 'Rotavator');
+    } else if (lower.includes('tractor')) {
+      detectedEquipment.push('Tractor', 'Farm Equipment');
+    } else if (!isHR && !isOperations) {
+      detectedEquipment.push('Farm Implements', 'Rotavator', 'MB Plough');
+    }
+  }
+
+  // 3. Detect Title & Seniority (context-driven)
+  let detectedTitle = matchedRegion?.realisticJobTitles ? matchedRegion.realisticJobTitles[1] || 'Area Sales Manager' : 'Territory Sales Manager';
+  let matchedTitles: string[] = matchedRegion?.realisticJobTitles 
+    ? [...matchedRegion.realisticJobTitles]
+    : ['Territory Manager', 'Area Sales Manager', 'ASM', 'Territory In-charge'];
   let seniority = 'mid';
-  let coreCompetencies = [
-    'Dealer Network Management',
-    'Channel Sales',
-    'Secondary Sales',
-    'Field Demonstration',
-    'Subsidy & DBT Documentation',
-  ];
+  let coreCompetencies = matchedRegion?.specialSkills && !isHR
+    ? [...matchedRegion.specialSkills.slice(0, 3), 'Dealer Network Management', 'Channel Sales']
+    : [
+        'Dealer Network Management',
+        'Channel Sales',
+        'Secondary Sales',
+        'Field Demonstration',
+        'Subsidy & DBT Documentation',
+      ];
 
   if (isHR) {
     if (lower.includes('sales')) {
@@ -249,13 +276,17 @@ function heuristicDomainParser(
     lower.includes('regional') ||
     lower.includes('state head') ||
     lower.includes('zonal') ||
-    lower.includes('pura northeast') ||
-    lower.includes('pura north') ||
-    lower.includes('pura south') ||
-    lower.includes('pura west')
+    /\b(pura|poora)\s*([a-z\s]+)\s*(sambhal|dekh|handle)/i.test(lower) ||
+    lower.includes('pura') ||
+    lower.includes('poora')
   ) {
-    detectedTitle = 'Regional Sales Manager';
-    matchedTitles = ['Regional Sales Manager', 'RSM', 'Zonal Head', 'State Head', 'Area Sales Manager'];
+    if (matchedRegion?.realisticJobTitles && matchedRegion.realisticJobTitles.length > 0) {
+      detectedTitle = `${matchedRegion.realisticJobTitles[0]} - Farm Implements & Machinery`;
+      matchedTitles = [...matchedRegion.realisticJobTitles];
+    } else {
+      detectedTitle = 'Regional Sales Manager';
+      matchedTitles = ['Regional Sales Manager', 'RSM', 'Zonal Head', 'State Head', 'Area Sales Manager'];
+    }
     seniority = 'senior';
   } else if (lower.includes('dealer') || lower.includes('network') || lower.includes('channel')) {
     detectedTitle = 'Dealer Development Manager';
@@ -295,7 +326,7 @@ function heuristicDomainParser(
     expMax = temp;
   }
 
-  // 5. Target Companies
+  // 5. Target Companies (Dynamic Context Resolution)
   let targetCompanies: string[];
   if (isHR) {
     targetCompanies = [
@@ -313,6 +344,8 @@ function heuristicDomainParser(
       'Shaktiman',
       'Fieldking',
     ];
+  } else if (matchedRegion?.dominantOEMs && matchedRegion.dominantOEMs.length > 0) {
+    targetCompanies = Array.from(new Set([...matchedRegion.dominantOEMs, ...TRACTOR_IMPLEMENTS_KNOWLEDGE.implementOEMs.slice(0, 10)]));
   } else {
     targetCompanies = [
       'Shaktiman',
@@ -359,8 +392,8 @@ function heuristicDomainParser(
       ];
 
   let qualification: string | undefined = undefined;
-  // Check degree/education mention (e.g. BE / B.Tech)
-  if (lower.includes('b.tech') || lower.includes('b tech') || lower.includes('be') || lower.includes('engineering')) {
+  // Check degree/education mention (e.g. BE / B.Tech / BBT)
+  if (lower.includes('b.tech') || lower.includes('b tech') || lower.includes('be') || lower.includes('bbt') || lower.includes('engineering')) {
     qualification = 'BE / B.Tech (Agri / Mechanical / Engineering)';
     coreCompetencies.unshift('BE / B.Tech');
   } else if (lower.includes('diploma')) {

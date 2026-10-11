@@ -23,6 +23,11 @@ export interface DomainKnowledgeBase {
     aliases?: string[];
     states: string[];
     majorHubs: string[];
+    dominantEquipment?: string[];
+    dominantOEMs?: string[];
+    realisticJobTitles?: string[];
+    specialSkills?: string[];
+    keySearchLocations?: string[];
   }[];
 }
 
@@ -276,39 +281,69 @@ export const TRACTOR_IMPLEMENTS_KNOWLEDGE: DomainKnowledgeBase = {
   indianAgriStatesAndHubs: [
     {
       region: 'North East India',
-      aliases: ['northeast', 'north east', 'north-east', 'ne', 'seven sisters'],
+      aliases: ['northeast', 'north east', 'north-east', 'ne', 'seven sisters', 'assam', 'guwahati'],
       states: ['Assam', 'Meghalaya', 'Tripura', 'Mizoram', 'Manipur', 'Nagaland', 'Arunachal Pradesh', 'Sikkim'],
       majorHubs: ['Guwahati', 'Siliguri', 'Dibrugarh', 'Jorhat', 'Silchar', 'Agartala', 'Shillong', 'Dimapur', 'Imphal', 'Aizawl', 'Gangtok', 'Tezpur', 'Tinsukia'],
+      dominantEquipment: ['Power Tiller', 'Rotavator', 'Weeder', 'Paddy Harvester', 'Reaper', 'Mini Tractor', 'Farm Implements'],
+      dominantOEMs: ['VST Tillers', 'Shaktiman', 'Fieldking', 'KisanKraft', 'Kamco', 'Sonalika', 'Mahindra Farm Equipment', 'Honda Power Products', 'Captain Tractors'],
+      realisticJobTitles: ['State Head', 'Area Sales Manager', 'ASM', 'Territory Manager', 'Regional Sales Manager', 'RSM'],
+      specialSkills: ['SMAM DBT Subsidy', 'State Agriculture Department Tender', 'Dealer Network (Assam & North East)', 'Power Tiller Sales', 'Farmer Demonstration'],
+      keySearchLocations: ['Guwahati', 'Assam', 'Siliguri', 'North East'],
     },
     {
       region: 'West India',
-      aliases: ['west', 'west india', 'western india'],
+      aliases: ['west', 'west india', 'western india', 'maharashtra', 'maharastra', 'gujarat'],
       states: ['Maharashtra', 'Gujarat', 'Goa'],
       majorHubs: ['Pune', 'Nashik', 'Nagpur', 'Aurangabad', 'Chhatrapati Sambhajinagar', 'Kolhapur', 'Ahmedabad', 'Rajkot', 'Surat', 'Baroda', 'Vadodara'],
+      dominantEquipment: ['Sugarcane Harvester', 'Boom Sprayer', 'Orchard Sprayer', 'MB Plough', 'Rotavator', 'Subsoiler', 'Reversible Plough'],
+      dominantOEMs: ['Mitra Sprayers', 'ASPEE', 'Lemken', 'Maschio Gaspardo', 'Shaktiman', 'Mahindra Farm Equipment', 'Swaraj Tractors', 'John Deere'],
+      realisticJobTitles: ['Area Sales Manager', 'Territory Manager', 'Regional Sales Manager', 'Zonal Manager', 'State Head'],
+      specialSkills: ['Sugarcane & Orchard Implements', 'Dealer Network (Maharashtra/Gujarat)', 'MahaDBT Subsidy', 'Tillage Equipment Sales'],
+      keySearchLocations: ['Maharashtra', 'Pune', 'Nashik', 'Nagpur', 'Gujarat', 'Ahmedabad'],
     },
     {
       region: 'North India',
-      aliases: ['north', 'north india', 'northern india'],
+      aliases: ['north', 'north india', 'northern india', 'punjab', 'haryana'],
       states: ['Punjab', 'Haryana', 'Uttar Pradesh', 'Rajasthan', 'Uttarakhand', 'Himachal Pradesh', 'Delhi NCR'],
       majorHubs: ['Ludhiana', 'Karnal', 'Chandigarh', 'Jaipur', 'Kota', 'Lucknow', 'Varanasi', 'Meerut', 'Agra', 'Gorakhpur', 'Bareilly'],
+      dominantEquipment: ['Combine Harvester', 'Round Baler', 'Straw Reaper', 'Laser Land Leveler', 'Super Seeder', 'Rotavator', 'Heavy Tractor'],
+      dominantOEMs: ['Claas India', 'Preet Agro', 'Dasmesh Mechanical Works', 'KS Agrotech', 'Kartar', 'Shaktiman', 'Fieldking', 'New Holland', 'Mahindra', 'Sonalika', 'John Deere'],
+      realisticJobTitles: ['Zonal Sales Manager', 'Regional Sales Manager', 'Area Sales Manager', 'Territory Manager', 'State Head'],
+      specialSkills: ['Harvester & Baler Channel Sales', 'Paddy Straw Management', 'Dealer Network (Punjab & Haryana)', 'High HP Tractor Matching'],
+      keySearchLocations: ['Punjab', 'Ludhiana', 'Haryana', 'Karnal', 'Chandigarh'],
     },
     {
       region: 'Central India',
-      aliases: ['central', 'central india'],
+      aliases: ['central', 'central india', 'madhya pradesh', 'chhattisgarh'],
       states: ['Madhya Pradesh', 'Chhattisgarh'],
       majorHubs: ['Indore', 'Bhopal', 'Jabalpur', 'Gwalior', 'Ujjain', 'Raipur', 'Bilaspur'],
+      dominantEquipment: ['Rotavator', 'MB Plough', 'Seed Drill', 'Thresher', 'Tractor Implements'],
+      dominantOEMs: ['Shaktiman', 'Fieldking', 'Lemken', 'Mahindra', 'Swaraj', 'TAFE', 'Eicher Tractors', 'Sonalika'],
+      realisticJobTitles: ['Area Sales Manager', 'Territory Manager', 'Regional Sales Manager'],
+      specialSkills: ['Dealer Network (MP & CG)', 'Soybean & Wheat Tillage Implements', 'Farmer Demonstrations'],
+      keySearchLocations: ['Madhya Pradesh', 'Indore', 'Bhopal', 'Raipur', 'Chhattisgarh'],
     },
     {
       region: 'South India',
-      aliases: ['south', 'south india', 'southern india'],
+      aliases: ['south', 'south india', 'southern india', 'karnataka', 'andhra', 'tamil nadu', 'telangana'],
       states: ['Andhra Pradesh', 'Telangana', 'Karnataka', 'Tamil Nadu', 'Kerala'],
       majorHubs: ['Hyderabad', 'Vijayawada', 'Guntur', 'Bengaluru', 'Hubli', 'Dharwad', 'Belgaum', 'Coimbatore', 'Madurai', 'Trichy'],
+      dominantEquipment: ['Power Tiller', 'Paddy Transplanter', 'Mini Tractor', 'Weeder', 'Boom Sprayer', 'Sugarcane Loader', 'Rotavator'],
+      dominantOEMs: ['VST Tillers Tractors', 'Kamco', 'KisanKraft', 'TAFE', 'Kubota', 'Yanmar India', 'Mahindra', 'Shaktiman', 'Captain Tractors'],
+      realisticJobTitles: ['Territory Manager', 'Area Sales Manager', 'Regional Sales Manager', 'State Head'],
+      specialSkills: ['SMAM DBT Subsidy', 'Power Tiller & Weeder Channel Sales', 'Paddy Mechanization', 'Dealer Network (South India)'],
+      keySearchLocations: ['Karnataka', 'Bengaluru', 'Hubli', 'Andhra Pradesh', 'Telangana', 'Hyderabad', 'Tamil Nadu'],
     },
     {
       region: 'East India',
-      aliases: ['east', 'east india', 'eastern india'],
+      aliases: ['east', 'east india', 'eastern india', 'bihar', 'bengal', 'odisha'],
       states: ['Bihar', 'West Bengal', 'Odisha', 'Jharkhand'],
       majorHubs: ['Patna', 'Muzaffarpur', 'Kolkata', 'Burdwan', 'Bhubaneswar', 'Cuttack', 'Ranchi'],
+      dominantEquipment: ['Power Tiller', 'Rotavator', 'Paddy Reaper', 'Mini Tractor', 'Thresher'],
+      dominantOEMs: ['VST Tillers', 'Shaktiman', 'Fieldking', 'Mahindra', 'Sonalika', 'KisanKraft', 'Kamco'],
+      realisticJobTitles: ['Area Sales Manager', 'Territory Manager', 'Regional Sales Manager', 'State Head'],
+      specialSkills: ['Dealer Network (Bihar/Bengal/Odisha)', 'DBT Subsidy Schemes', 'Paddy Implements Sales'],
+      keySearchLocations: ['Bihar', 'Patna', 'West Bengal', 'Kolkata', 'Odisha', 'Bhubaneswar'],
     },
   ],
 };

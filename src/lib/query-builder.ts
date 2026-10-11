@@ -1,85 +1,163 @@
 import { ParsedPosition, GeneratedQueries } from './types';
+import { TRACTOR_IMPLEMENTS_KNOWLEDGE } from './domain-knowledge';
+
+function findMatchingRegionData(locations: string[]) {
+  if (!locations || locations.length === 0) return null;
+  const locLower = locations.map(l => l.toLowerCase()).join(' ');
+
+  const matchesWord = (str: string, word: string) => {
+    return new RegExp(`(^|\\s|[^a-z0-9])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-z0-9])`, 'i').test(str);
+  };
+
+  for (const reg of TRACTOR_IMPLEMENTS_KNOWLEDGE.indianAgriStatesAndHubs) {
+    if (reg.aliases?.some(a => a.length <= 4 ? matchesWord(locLower, a) : locLower.includes(a.toLowerCase()))) {
+      return reg;
+    }
+    if (reg.states?.some(s => matchesWord(locLower, s.toLowerCase()) || locLower.includes(s.toLowerCase()))) {
+      return reg;
+    }
+    if (reg.majorHubs?.some(h => matchesWord(locLower, h.toLowerCase()) || locLower.includes(h.toLowerCase()))) {
+      return reg;
+    }
+  }
+  return null;
+}
+
+function getRealisticLocationGroup(locations: string[]): string {
+  if (!locations || locations.length === 0) return '';
+  const regionData = findMatchingRegionData(locations);
+
+  if (regionData?.keySearchLocations && regionData.keySearchLocations.length > 0) {
+    return `(${regionData.keySearchLocations.map(l => `"${l}"`).join(' OR ')})`;
+  }
+
+  return `(${locations.slice(0, 4).map(l => `"${l}"`).join(' OR ')})`;
+}
+
+function getRealisticTitleGroup(parsed: ParsedPosition): string {
+  const isCorporateOrHR = parsed.title.toLowerCase().includes('hr') || 
+                          parsed.title.toLowerCase().includes('finance') || 
+                          parsed.title.toLowerCase().includes('legal') ||
+                          parsed.title.toLowerCase().includes('recruitment');
+
+  const regionData = findMatchingRegionData(parsed.locations);
+
+  const asksFullTerritory = parsed.seniorityLevel === 'senior' || 
+                            parsed.title.toLowerCase().includes('regional') || 
+                            parsed.title.toLowerCase().includes('zonal') || 
+                            parsed.title.toLowerCase().includes('state');
+
+  if (!isCorporateOrHR && asksFullTerritory && regionData?.realisticJobTitles && regionData.realisticJobTitles.length > 0) {
+    return `(${regionData.realisticJobTitles.slice(0, 5).map(t => `"${t}"`).join(' OR ')})`;
+  }
+
+  if (parsed.standardTitles.length > 0) {
+    return `(${parsed.standardTitles.slice(0, 5).map(t => `"${t}"`).join(' OR ')})`;
+  }
+  return `("${parsed.title}")`;
+}
+
+function getRealisticDomainGroup(parsed: ParsedPosition): string {
+  const isCorporateOrHR = parsed.title.toLowerCase().includes('hr') || 
+                          parsed.title.toLowerCase().includes('finance') || 
+                          parsed.title.toLowerCase().includes('legal') ||
+                          parsed.title.toLowerCase().includes('recruitment');
+
+  const regionData = findMatchingRegionData(parsed.locations);
+
+  // 1. If it's field equipment/sales and we have regional domain intelligence
+  if (!isCorporateOrHR && regionData) {
+    const regionalOEMs = regionData.dominantOEMs ? regionData.dominantOEMs.slice(0, 4).map(c => `"${c.split(' ')[0]}"`) : [];
+    const regionalEquip = regionData.dominantEquipment ? regionData.dominantEquipment.slice(0, 3).map(e => `"${e}"`) : [];
+    const explicitEquip = parsed.equipmentFocus.slice(0, 3).map(e => `"${e}"`);
+    const explicitCompanies = parsed.targetCompanies.slice(0, 4).map(c => `"${c.split(' ')[0]}"`);
+
+    const pool = Array.from(new Set([...explicitCompanies, ...explicitEquip, ...regionalOEMs, ...regionalEquip]));
+    if (pool.length > 0) {
+      return `(${pool.slice(0, 8).join(' OR ')})`;
+    }
+  }
+
+  // 2. Generic dynamic resolution from parsed position data
+  const items: string[] = [];
+  parsed.targetCompanies.slice(0, 5).forEach(c => {
+    const firstWord = c.split(' ')[0];
+    if (firstWord && !items.includes(`"${firstWord}"`)) items.push(`"${firstWord}"`);
+  });
+  parsed.equipmentFocus.slice(0, 4).forEach(e => {
+    if (!items.includes(`"${e}"`)) items.push(`"${e}"`);
+  });
+
+  if (items.length > 0) {
+    return `(${items.slice(0, 8).join(' OR ')})`;
+  }
+
+  if (parsed.coreCompetencies.length > 0) {
+    return `(${parsed.coreCompetencies.slice(0, 4).map(s => `"${s}"`).join(' OR ')})`;
+  }
+
+  return '("Tractor" OR "Farm Equipment" OR "Manufacturing")';
+}
 
 export function buildGeneratedQueries(parsed: ParsedPosition): GeneratedQueries {
-  // 1. NAUKRI RESDEX BOOLEAN
-  const titleGroup = parsed.standardTitles.length > 0 
-    ? parsed.standardTitles.slice(0, 5).map(t => `"${t}"`).join(' OR ')
-    : `"${parsed.title}"`;
-
   const topCompanies = parsed.targetCompanies.slice(0, 10);
-  const productAndCompanyPool = [
-    ...parsed.equipmentFocus.slice(0, 5),
-    ...topCompanies,
-  ];
-  const domainGroup = productAndCompanyPool.length > 0
-    ? productAndCompanyPool.map(p => `"${p}"`).join(' OR ')
-    : `"Tractor" OR "Agricultural Machinery" OR "Farm Equipment" OR "Shaktiman" OR "Fieldking" OR "Mahindra"`;
+  const realisticTitle = getRealisticTitleGroup(parsed);
+  const realisticDomain = getRealisticDomainGroup(parsed);
+  const realisticLoc = getRealisticLocationGroup(parsed.locations);
+
+  const qualGroup = parsed.qualification && /b\.?tech|be|engineering/i.test(parsed.qualification)
+    ? '("B.Tech" OR "B.E" OR "BE" OR "Engineering")'
+    : '';
 
   const skillsGroup = parsed.coreCompetencies.length > 0
     ? parsed.coreCompetencies.slice(0, 4).map(s => `"${s}"`).join(' OR ')
     : `"Dealer Network" OR "Channel Sales"`;
 
-  const locationGroup = parsed.locations.length > 0
-    ? parsed.locations.map(l => `"${l}"`).join(' OR ')
-    : '';
-
   const exclusions = parsed.exclusions.slice(0, 6).map(e => `"${e}"`).join(' OR ');
 
-  // Standard Boolean for all target lateral talent
-  let naukriBoolean = `(${titleGroup}) AND (${domainGroup}) AND (${skillsGroup})`;
-  if (locationGroup) naukriBoolean += ` AND (${locationGroup})`;
+  // 1. NAUKRI RESDEX BOOLEAN
+  let naukriBoolean = `${realisticTitle} AND ${realisticDomain}`;
+  if (qualGroup) naukriBoolean += ` AND ${qualGroup}`;
+  if (skillsGroup) naukriBoolean += ` AND (${skillsGroup})`;
+  if (realisticLoc) naukriBoolean += ` AND ${realisticLoc}`;
   if (exclusions) naukriBoolean += ` NOT (${exclusions})`;
 
   // Specialized: Candidates who left their job / Notice Period / Immediate Joiners
-  let naukriExEmployee = `(${titleGroup}) AND (${domainGroup}) AND ("Serving Notice Period" OR "Immediate Joiner" OR "Notice Period" OR "Immediate" OR "Available to Join" OR "Ex-" OR "Actively Looking")`;
-  if (locationGroup) naukriExEmployee += ` AND (${locationGroup})`;
+  let naukriExEmployee = `${realisticTitle} AND ${realisticDomain} AND ("Serving Notice Period" OR "Immediate Joiner" OR "Notice Period" OR "Immediate" OR "Available to Join" OR "Ex-" OR "Actively Looking")`;
+  if (qualGroup) naukriExEmployee += ` AND ${qualGroup}`;
+  if (realisticLoc) naukriExEmployee += ` AND ${realisticLoc}`;
   if (exclusions) naukriExEmployee += ` NOT (${exclusions})`;
 
   // Specialized: Freshers & Trainees (GET / MT / B.Tech / Diploma)
   const fresherTitles = '"Fresher" OR "Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Diploma Trainee" OR "Sales Trainee" OR "Trainee Engineer"';
-  const fresherDegrees = '"B.Tech" OR "B.E." OR "Diploma Mechanical" OR "B.Sc Agriculture" OR "Agricultural Engineering"';
-  let naukriFresher = `(${fresherTitles}) AND (${fresherDegrees}) AND (${domainGroup})`;
-  if (locationGroup) naukriFresher += ` AND (${locationGroup})`;
+  const fresherDegrees = qualGroup || '"B.Tech" OR "B.E." OR "Diploma Mechanical" OR "B.Sc Agriculture" OR "Agricultural Engineering"';
+  let naukriFresher = `(${fresherTitles}) AND (${fresherDegrees}) AND ${realisticDomain}`;
+  if (realisticLoc) naukriFresher += ` AND ${realisticLoc}`;
   if (exclusions) naukriFresher += ` NOT (${exclusions})`;
 
   const designationSearch = parsed.standardTitles.slice(0, 5).join(' OR ');
   const mandatorySkills = [...parsed.equipmentFocus.slice(0, 3), ...parsed.coreCompetencies.slice(0, 2)];
 
   // 2. LINKEDIN QUERY & DIRECT URLs
-  const linkedInTitles = parsed.standardTitles.slice(0, 3).map(t => `"${t}"`).join(' OR ');
-  const domainKeywords = parsed.equipmentFocus.length > 0
-    ? parsed.equipmentFocus.slice(0, 2)
-    : (parsed.targetCompanies.length > 0 ? parsed.targetCompanies.slice(0, 2) : parsed.coreCompetencies.slice(0, 2));
-
-  const linkedInDomain = domainKeywords.map(k => `"${k}"`).join(' OR ');
-  const linkedInLoc = parsed.locations[0] ? `"${parsed.locations[0]}"` : '';
-  
-  const linkedInStandardQuery = `(${linkedInTitles}) AND (${linkedInDomain})${linkedInLoc ? ` AND ${linkedInLoc}` : ''}`;
+  const linkedInStandardQuery = `${realisticTitle} AND ${realisticDomain}${realisticLoc ? ` AND ${realisticLoc}` : ''}`;
   const linkedInSearchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(linkedInStandardQuery)}`;
 
-  const linkedInExQuery = `(${linkedInTitles}) AND (${linkedInDomain}) AND ("Ex-" OR "Former" OR "Immediate" OR "Open to work" OR "Notice Period")${linkedInLoc ? ` AND ${linkedInLoc}` : ''}`;
+  const linkedInExQuery = `${realisticTitle} AND ${realisticDomain} AND ("Ex-" OR "Former" OR "Immediate" OR "Open to work" OR "Notice Period")${realisticLoc ? ` AND ${realisticLoc}` : ''}`;
   const linkedInExSearchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(linkedInExQuery)}`;
 
   const degreeKeywords = parsed.qualification ? `"${parsed.qualification.split(' ')[0]}"` : '"B.Tech" OR "B.E." OR "Diploma"';
-  const linkedInFresherQuery = `("Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Fresher" OR "Trainee") AND (${degreeKeywords}) AND (${linkedInDomain})${linkedInLoc ? ` AND ${linkedInLoc}` : ''}`;
+  const linkedInFresherQuery = `("Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Fresher" OR "Trainee") AND (${degreeKeywords}) AND ${realisticDomain}${realisticLoc ? ` AND ${realisticLoc}` : ''}`;
   const linkedInFresherSearchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(linkedInFresherQuery)}`;
 
   // 3. GOOGLE X-RAY SEARCH (FREE CANDIDATES WITHOUT LINKEDIN RECRUITER)
-  const xrayCompanies = topCompanies.slice(0, 5).map(c => `"${c.split(' ')[0]}"`).join(' OR ');
-  const xrayDomain = parsed.equipmentFocus.length > 0
-    ? parsed.equipmentFocus.slice(0, 3).map(e => `"${e}"`).join(' OR ')
-    : (parsed.coreCompetencies.length > 0 ? parsed.coreCompetencies.slice(0, 3).map(c => `"${c}"`).join(' OR ') : '"Manufacturing" OR "Automotive"');
-  const xrayTitles = parsed.standardTitles.slice(0, 3).map(t => `"${t}"`).join(' OR ');
-  const xrayLoc = parsed.locations.length > 0 ? `("${parsed.locations.slice(0, 3).join('" OR "')}")` : '';
-
-  const googleXrayStandard = `site:linkedin.com/in (${xrayCompanies ? `${xrayCompanies} OR ` : ''}${xrayDomain}) (${xrayTitles}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
+  const googleXrayStandard = `site:linkedin.com/in ${realisticTitle} ${realisticDomain} ${realisticLoc} -intitle:jobs -intitle:recruiter`.trim();
   const googleXrayUrl = `https://www.google.com/search?q=${encodeURIComponent(googleXrayStandard)}`;
 
   const exCompanyList = topCompanies.slice(0, 4).map(c => `"ex-${c.split(' ')[0]}"`).join(' OR ');
-  const googleXrayEx = `site:linkedin.com/in (${exCompanyList ? `${exCompanyList} OR ` : ''}"immediate joiner" OR "open to work" OR "serving notice") (${xrayDomain}) (${xrayTitles}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
+  const googleXrayEx = `site:linkedin.com/in (${exCompanyList ? `${exCompanyList} OR ` : ''}"immediate joiner" OR "open to work" OR "serving notice") ${realisticDomain} ${realisticTitle} ${realisticLoc} -intitle:jobs -intitle:recruiter`.trim();
   const googleXrayExUrl = `https://www.google.com/search?q=${encodeURIComponent(googleXrayEx)}`;
 
-  const googleXrayFresher = `site:linkedin.com/in ("Fresher" OR "Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Trainee") (${degreeKeywords}) (${xrayDomain}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
+  const googleXrayFresher = `site:linkedin.com/in ("Fresher" OR "Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Trainee") (${degreeKeywords}) ${realisticDomain} ${realisticLoc} -intitle:jobs -intitle:recruiter`.trim();
   const googleXrayFresherUrl = `https://www.google.com/search?q=${encodeURIComponent(googleXrayFresher)}`;
 
   // 4. WHATSAPP & REFERRAL BROADCAST
