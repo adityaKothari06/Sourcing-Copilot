@@ -34,13 +34,13 @@ ${text}
         let response;
         try {
           response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
+            model: 'gemini-2.5-flash',
             contents: prompt,
           });
         } catch (err) {
-          console.warn('gemini-3.5-flash-lite failed, trying gemini-3.5-flash:', err);
+          console.warn('gemini-2.5-flash failed, trying gemini-2.0-flash:', err);
           response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash',
+            model: 'gemini-2.0-flash',
             contents: prompt,
           });
         }

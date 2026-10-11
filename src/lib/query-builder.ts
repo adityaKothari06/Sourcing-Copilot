@@ -47,11 +47,11 @@ export function buildGeneratedQueries(parsed: ParsedPosition): GeneratedQueries 
 
   // 2. LINKEDIN QUERY & DIRECT URLs
   const linkedInTitles = parsed.standardTitles.slice(0, 3).map(t => `"${t}"`).join(' OR ');
-  const linkedInDomain = [
-    parsed.equipmentFocus[0] || 'Farm Implements',
-    parsed.targetCompanies[0] || 'Shaktiman',
-    parsed.targetCompanies[1] || 'Fieldking',
-  ].map(k => `"${k}"`).join(' OR ');
+  const domainKeywords = parsed.equipmentFocus.length > 0
+    ? parsed.equipmentFocus.slice(0, 2)
+    : (parsed.targetCompanies.length > 0 ? parsed.targetCompanies.slice(0, 2) : parsed.coreCompetencies.slice(0, 2));
+
+  const linkedInDomain = domainKeywords.map(k => `"${k}"`).join(' OR ');
   const linkedInLoc = parsed.locations[0] ? `"${parsed.locations[0]}"` : '';
   
   const linkedInStandardQuery = `(${linkedInTitles}) AND (${linkedInDomain})${linkedInLoc ? ` AND ${linkedInLoc}` : ''}`;
@@ -60,22 +60,26 @@ export function buildGeneratedQueries(parsed: ParsedPosition): GeneratedQueries 
   const linkedInExQuery = `(${linkedInTitles}) AND (${linkedInDomain}) AND ("Ex-" OR "Former" OR "Immediate" OR "Open to work" OR "Notice Period")${linkedInLoc ? ` AND ${linkedInLoc}` : ''}`;
   const linkedInExSearchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(linkedInExQuery)}`;
 
-  const linkedInFresherQuery = `("Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Fresher") AND ("B.Tech" OR "Diploma") AND (${linkedInDomain})${linkedInLoc ? ` AND ${linkedInLoc}` : ''}`;
+  const degreeKeywords = parsed.qualification ? `"${parsed.qualification.split(' ')[0]}"` : '"B.Tech" OR "B.E." OR "Diploma"';
+  const linkedInFresherQuery = `("Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Fresher" OR "Trainee") AND (${degreeKeywords}) AND (${linkedInDomain})${linkedInLoc ? ` AND ${linkedInLoc}` : ''}`;
   const linkedInFresherSearchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(linkedInFresherQuery)}`;
 
   // 3. GOOGLE X-RAY SEARCH (FREE CANDIDATES WITHOUT LINKEDIN RECRUITER)
   const xrayCompanies = topCompanies.slice(0, 5).map(c => `"${c.split(' ')[0]}"`).join(' OR ');
-  const xrayDomain = parsed.equipmentFocus.slice(0, 3).map(e => `"${e}"`).join(' OR ') || '"Farm Implements" OR "Tractor"';
+  const xrayDomain = parsed.equipmentFocus.length > 0
+    ? parsed.equipmentFocus.slice(0, 3).map(e => `"${e}"`).join(' OR ')
+    : (parsed.coreCompetencies.length > 0 ? parsed.coreCompetencies.slice(0, 3).map(c => `"${c}"`).join(' OR ') : '"Manufacturing" OR "Automotive"');
   const xrayTitles = parsed.standardTitles.slice(0, 3).map(t => `"${t}"`).join(' OR ');
   const xrayLoc = parsed.locations.length > 0 ? `("${parsed.locations.slice(0, 3).join('" OR "')}")` : '';
 
   const googleXrayStandard = `site:linkedin.com/in (${xrayCompanies ? `${xrayCompanies} OR ` : ''}${xrayDomain}) (${xrayTitles}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
   const googleXrayUrl = `https://www.google.com/search?q=${encodeURIComponent(googleXrayStandard)}`;
 
-  const googleXrayEx = `site:linkedin.com/in ("ex-Shaktiman" OR "ex-Fieldking" OR "ex-Lemken" OR "ex-Mahindra" OR "ex-Sonalika" OR "immediate joiner" OR "open to work" OR "serving notice") (${xrayDomain}) (${xrayTitles}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
+  const exCompanyList = topCompanies.slice(0, 4).map(c => `"ex-${c.split(' ')[0]}"`).join(' OR ');
+  const googleXrayEx = `site:linkedin.com/in (${exCompanyList ? `${exCompanyList} OR ` : ''}"immediate joiner" OR "open to work" OR "serving notice") (${xrayDomain}) (${xrayTitles}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
   const googleXrayExUrl = `https://www.google.com/search?q=${encodeURIComponent(googleXrayEx)}`;
 
-  const googleXrayFresher = `site:linkedin.com/in ("Fresher" OR "Graduate Engineer Trainee" OR "GET" OR "Management Trainee") ("B.Tech" OR "Diploma" OR "Agriculture") (${xrayDomain}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
+  const googleXrayFresher = `site:linkedin.com/in ("Fresher" OR "Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Trainee") (${degreeKeywords}) (${xrayDomain}) ${xrayLoc} -intitle:jobs -intitle:recruiter`.trim();
   const googleXrayFresherUrl = `https://www.google.com/search?q=${encodeURIComponent(googleXrayFresher)}`;
 
   // 4. WHATSAPP & REFERRAL BROADCAST
@@ -87,33 +91,33 @@ export function buildGeneratedQueries(parsed: ParsedPosition): GeneratedQueries 
     ? (safeMin === safeMax ? `${safeMin}+ yrs` : `${safeMin}-${safeMax} yrs`)
     : (parsed.seniorityLevel === 'junior' ? '0-2 yrs (Freshers & Trainees welcome)' : 'relevant experience');
   const locStr = parsed.locations.length > 0 ? parsed.locations.slice(0, 3).join(' / ') : 'India';
-  const equipmentStr = parsed.equipmentFocus.length > 0 ? parsed.equipmentFocus.slice(0, 3).join(' & ') : 'Tractor / Farm Implements';
+  const equipmentStr = parsed.equipmentFocus.length > 0 ? parsed.equipmentFocus.slice(0, 3).join(' & ') : '';
+  const domainContext = equipmentStr ? `sector: *Agricultural Equipment & Machinery*` : `domain: *${parsed.coreCompetencies.slice(0, 2).join(' / ')}*`;
+  const targetCompStr = topCompanies.slice(0, 6).join(', ');
 
-  const whatsappTemplate = `🚜 *Urgent Hiring: ${parsed.title}*
+  const whatsappTemplate = `🎯 *Urgent Hiring: ${parsed.title}*
 
-Hello, we are sourcing for a reputed OEM in the *Agricultural Equipment & Tractor* sector:
+Hello, we are sourcing for a key mandate in the ${domainContext}:
 
 • *Role:* ${parsed.title}
-• *Product Focus:* ${equipmentStr}
-• *Target Location:* ${locStr}
+${equipmentStr ? `• *Product Focus:* ${equipmentStr}\n` : ''}• *Target Location:* ${locStr}
 • *Experience:* ${expStr}
-${parsed.qualification ? `• *Qualification:* ${parsed.qualification}\n` : ''}• *Target Background:* Ex/Current employees from Shaktiman, Fieldking, Lemken, Mahindra, Sonalika, TAFE, Escorts Kubota, etc.
-• *Core Focus:* Dealer network management, field demo & channel growth.
+${parsed.qualification ? `• *Qualification:* ${parsed.qualification}\n` : ''}${targetCompStr ? `• *Target Companies:* ${targetCompStr}\n` : ''}• *Core Focus:* ${parsed.coreCompetencies.slice(0, 3).join(', ')}
 
 If you or someone in your network (including immediate joiners or available candidates) might be open for this confidential mandate, please connect or share CV. 
 
 Direct contact: [Your Name/Number]
 Thank you!`;
 
-  const emailSnippet = `Subject: Confidential Opportunity: ${parsed.title} (${equipmentStr}) - ${locStr}
+  const emailSnippet = `Subject: Confidential Opportunity: ${parsed.title}${equipmentStr ? ` (${equipmentStr})` : ''} - ${locStr}
 
 Dear Candidate,
 
 Hope you are doing well. 
 
-We are currently leading an executive search for a leading manufacturer in the Tractor & Farm Implements space. We are looking for an experienced ${parsed.title} (${expStr}) to lead operations in ${locStr}.
+We are currently leading an executive search for a leading organization. We are looking for an experienced ${parsed.title} (${expStr}) to take charge of operations in ${locStr}.
 
-Given your background in ${equipmentStr} and dealer channel management, your profile appears to be a strong fit.
+Given your background in ${equipmentStr || parsed.coreCompetencies.slice(0, 2).join(', ')}, your profile appears to be a strong fit for this mandate.
 
 If you are open to exploring next steps or having a brief confidential call, please reply with your updated profile or suitable time to speak.
 

@@ -689,33 +689,39 @@ export default function SourcingCopilotPage() {
 
                 {/* Key Attributes Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
-                  {/* Equipment Focus */}
+                  {/* Equipment / Domain Focus */}
                   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-2">
                     <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
                       <Layers className="w-3.5 h-3.5 text-blue-400" />
-                      Target Equipment / Implements Focus:
+                      Target Equipment / Domain Focus:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {activePosition.parsed.equipmentFocus.map((eq, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 rounded-md bg-blue-950/70 border border-blue-800/50 text-blue-200 text-[11px] font-medium"
-                        >
-                          {eq}
+                      {activePosition.parsed.equipmentFocus.length > 0 ? (
+                        activePosition.parsed.equipmentFocus.map((eq, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-0.5 rounded-md bg-blue-950/70 border border-blue-800/50 text-blue-200 text-[11px] font-medium"
+                          >
+                            {eq}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">
+                          Functional / Corporate Focus (Non-Equipment)
                         </span>
-                      ))}
+                      )}
                     </div>
                   </div>
 
-                  {/* Competitor OEMs */}
+                  {/* Competitor Companies / OEMs */}
                   <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
                         <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                        Target Competitor OEMs to Poach:
+                        Target Companies to Poach:
                       </span>
                       <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">
-                        {activePosition.parsed.targetCompanies.length} Indian OEMs
+                        {activePosition.parsed.targetCompanies.length} Target Companies
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
