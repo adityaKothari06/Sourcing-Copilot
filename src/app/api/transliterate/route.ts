@@ -38,9 +38,9 @@ ${text}
             contents: prompt,
           });
         } catch (err) {
-          console.warn('gemini-2.5-flash failed, trying gemini-2.0-flash:', err);
+          console.warn('gemini-2.5-flash failed, trying gemini-3.8-flash:', err);
           response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3.8-flash',
             contents: prompt,
           });
         }

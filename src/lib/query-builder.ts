@@ -9,14 +9,26 @@ function findMatchingRegionData(locations: string[]) {
     return new RegExp(`(^|\\s|[^a-z0-9])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-z0-9])`, 'i').test(str);
   };
 
+  // Phase 1: Explicit State match FIRST (e.g. West Bengal, Maharashtra, Punjab, Assam)
   for (const reg of TRACTOR_IMPLEMENTS_KNOWLEDGE.indianAgriStatesAndHubs) {
-    if (reg.aliases?.some(a => a.length <= 4 ? matchesWord(locLower, a) : locLower.includes(a.toLowerCase()))) {
-      return reg;
-    }
     if (reg.states?.some(s => matchesWord(locLower, s.toLowerCase()) || locLower.includes(s.toLowerCase()))) {
       return reg;
     }
+  }
+
+  // Phase 2: Major Hub match (e.g. Kolkata, Burdwan, Siliguri, Pune, Ludhiana, Guwahati)
+  for (const reg of TRACTOR_IMPLEMENTS_KNOWLEDGE.indianAgriStatesAndHubs) {
     if (reg.majorHubs?.some(h => matchesWord(locLower, h.toLowerCase()) || locLower.includes(h.toLowerCase()))) {
+      return reg;
+    }
+  }
+
+  // Phase 3: Region name / alias match (with word boundary)
+  for (const reg of TRACTOR_IMPLEMENTS_KNOWLEDGE.indianAgriStatesAndHubs) {
+    if (matchesWord(locLower, reg.region.toLowerCase()) || locLower.includes(reg.region.toLowerCase())) {
+      return reg;
+    }
+    if (reg.aliases?.some(a => a.length <= 4 ? matchesWord(locLower, a) : locLower.includes(a.toLowerCase()))) {
       return reg;
     }
   }
@@ -25,8 +37,15 @@ function findMatchingRegionData(locations: string[]) {
 
 function getRealisticLocationGroup(locations: string[]): string {
   if (!locations || locations.length === 0) return '';
-  const regionData = findMatchingRegionData(locations);
+  const locLower = locations.map(l => l.toLowerCase()).join(' ');
 
+  // If specific state or city is mentioned, prioritize local state hubs
+  const isWestBengal = locLower.includes('bengal') || locLower.includes('kolkata');
+  if (isWestBengal) {
+    return '("West Bengal" OR "Kolkata" OR "Burdwan" OR "Siliguri" OR "Bengal")';
+  }
+
+  const regionData = findMatchingRegionData(locations);
   if (regionData?.keySearchLocations && regionData.keySearchLocations.length > 0) {
     return `(${regionData.keySearchLocations.map(l => `"${l}"`).join(' OR ')})`;
   }
@@ -47,13 +66,15 @@ function getRealisticTitleGroup(parsed: ParsedPosition): string {
                             parsed.title.toLowerCase().includes('zonal') || 
                             parsed.title.toLowerCase().includes('state');
 
+  // If parsed has specific standardTitles from the JD or AI, prioritize those
+  if (parsed.standardTitles.length > 0) {
+    return `(${parsed.standardTitles.slice(0, 6).map(t => `"${t}"`).join(' OR ')})`;
+  }
+
   if (!isCorporateOrHR && asksFullTerritory && regionData?.realisticJobTitles && regionData.realisticJobTitles.length > 0) {
     return `(${regionData.realisticJobTitles.slice(0, 5).map(t => `"${t}"`).join(' OR ')})`;
   }
 
-  if (parsed.standardTitles.length > 0) {
-    return `(${parsed.standardTitles.slice(0, 5).map(t => `"${t}"`).join(' OR ')})`;
-  }
   return `("${parsed.title}")`;
 }
 
@@ -105,9 +126,17 @@ export function buildGeneratedQueries(parsed: ParsedPosition): GeneratedQueries 
   const realisticDomain = getRealisticDomainGroup(parsed);
   const realisticLoc = getRealisticLocationGroup(parsed.locations);
 
-  const qualGroup = parsed.qualification && /b\.?tech|be|engineering/i.test(parsed.qualification)
-    ? '("B.Tech" OR "B.E" OR "BE" OR "Engineering")'
-    : '';
+  const isDiplomaOrITI = parsed.qualification && /diploma|iti|polytechnic/i.test(parsed.qualification);
+  const isEngineering = parsed.qualification && /b\.?tech|be|\bdegree\b/i.test(parsed.qualification);
+
+  let qualGroup = '';
+  if (isDiplomaOrITI && isEngineering) {
+    qualGroup = '("Diploma" OR "ITI" OR "B.Tech" OR "B.E" OR "BE" OR "Engineering")';
+  } else if (isDiplomaOrITI) {
+    qualGroup = '("Diploma" OR "ITI" OR "Polytechnic")';
+  } else if (isEngineering || (parsed.qualification && /engineering/i.test(parsed.qualification))) {
+    qualGroup = '("B.Tech" OR "B.E" OR "BE" OR "Engineering")';
+  }
 
   const skillsGroup = parsed.coreCompetencies.length > 0
     ? parsed.coreCompetencies.slice(0, 4).map(s => `"${s}"`).join(' OR ')
@@ -145,7 +174,7 @@ export function buildGeneratedQueries(parsed: ParsedPosition): GeneratedQueries 
   const linkedInExQuery = `${realisticTitle} AND ${realisticDomain} AND ("Ex-" OR "Former" OR "Immediate" OR "Open to work" OR "Notice Period")${realisticLoc ? ` AND ${realisticLoc}` : ''}`;
   const linkedInExSearchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(linkedInExQuery)}`;
 
-  const degreeKeywords = parsed.qualification ? `"${parsed.qualification.split(' ')[0]}"` : '"B.Tech" OR "B.E." OR "Diploma"';
+  const degreeKeywords = isDiplomaOrITI ? '"Diploma" OR "ITI" OR "Engineering"' : (parsed.qualification ? `"${parsed.qualification.split(' ')[0]}"` : '"B.Tech" OR "B.E." OR "Diploma"');
   const linkedInFresherQuery = `("Graduate Engineer Trainee" OR "GET" OR "Management Trainee" OR "Fresher" OR "Trainee") AND (${degreeKeywords}) AND ${realisticDomain}${realisticLoc ? ` AND ${realisticLoc}` : ''}`;
   const linkedInFresherSearchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(linkedInFresherQuery)}`;
 

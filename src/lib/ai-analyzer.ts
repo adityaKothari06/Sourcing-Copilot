@@ -75,16 +75,22 @@ ${rawInput}
 
 Domain & Extraction Rules:
 1. Candidate Role & Recruiter Shorthand:
-   - Accurately determine the exact functional area (Sales, HR, Customer Service, Plant, Quality, Engineering, Supply Chain, Finance).
-   - "BBT" / "bbt" / "b.tech" / "be": In Indian recruiter speech/notes, "BBT" refers to **BE / B.Tech (Engineering Graduate)** (Mechanical or Agricultural Engineering).
+   - If a full Job Description is provided with a header (e.g. "Job Description: Field Technical & Business Development Executive – Farm Machinery"), PRESERVE the authentic role title (e.g. "Field Technical & Business Development Executive - Farm Machinery") and extract relevant standard designations (e.g. ["Field Technical Executive", "Business Development Executive", "Territory Sales Executive", "Sales & Service Executive", "Field Service Engineer", "Field Sales Engineer"]).
+   - Accurately determine the exact functional area: Field Sales, Technical Sales / Field Service, HR, Plant Operations, Quality, etc.
+   - "BBT" / "bbt": In Indian recruiter speech/notes, "BBT" refers to **BE / B.Tech (Engineering Graduate)**.
    - If the brief mentions "sales hr", "hr", "recruiter", "talent acquisition", or "hrbp", the role MUST be Human Resources / Talent Acquisition, NOT a Sales Manager!
 2. Regional Market Realities & Realistic Designations:
+   - **East India (West Bengal / Bihar / Odisha / Jharkhand)**:
+     - Real market context: West Bengal & East India agriculture is dominated by small/marginal holdings and intensive paddy cultivation.
+     - Dominant machinery: **Power Tillers, Rotary Tillers, Power Weeders, Paddy Transplanters, Paddy Reapers / Reaper Binders, Threshers, Mini Tractors, Farm Implements**.
+     - Top OEMs: **VST Tillers Tractors, KisanKraft, Kamco, Shaktiman, Fieldking, Mahindra Farm Equipment, Sonalika, Captain Tractors, Honda Power Products**.
+     - Hubs: West Bengal, Kolkata, Burdwan (Bardhaman), Siliguri, Durgapur, Midnapore.
+     - Realistic titles: "Territory Sales Executive", "Field Technical Executive", "Business Development Executive", "Sales & Service Executive", "Area Sales Manager", "Field Service Engineer".
    - **North East India Market Context**:
-     - Real market titles: "State Head - Assam & North East", "Area Sales Manager (ASM) - North East", "Regional Sales Manager (RSM)", "Territory Manager". (NEVER use unrealistic corporate designations like "Business Head - North East" or "Regional Head - Sales" which do not exist in NE agri-machinery).
-     - Dominant machinery in NE: North East agriculture is predominantly hilly, terrace, and paddy small holdings. Dominant equipment is **Power Tillers, Rotavators, Weeders, Paddy Harvesters, Reapers, and Mini Tractors**.
+     - Real market titles: "State Head - Assam & North East", "Area Sales Manager (ASM) - North East", "Regional Sales Manager (RSM)", "Territory Manager".
+     - Dominant machinery in NE: **Power Tillers, Rotavators, Weeders, Paddy Harvesters, Reapers, Mini Tractors**.
      - Top OEMs in NE: **VST Tillers Tractors, Shaktiman, Fieldking, KisanKraft, Kamco, Sonalika, Mahindra Farm Equipment, Honda Power Products**.
-     - Crucial skills: **SMAM DBT Government Subsidies, State Agriculture Directorate tender billing, Dealer Network across Assam and 7 Sisters, Farmer Field Demonstrations**.
-     - Hubs: Guwahati, Siliguri, Assam.
+     - Hubs: Guwahati, Assam, Siliguri.
    - **North India (Punjab / Haryana / Western UP)**:
      - Real titles: "Zonal Sales Manager", "Regional Sales Manager", "Area Sales Manager".
      - Dominant machinery: Combine Harvesters, Round Balers, Straw Reapers, Laser Land Levelers, Super Seeders, Heavy Tractors.
@@ -96,28 +102,28 @@ Domain & Extraction Rules:
      - Dominant machinery: Power Tillers, Paddy Transplanters, Weeders, Mini Tractors, Sprayers.
      - Top OEMs: VST Tillers, Kamco, KisanKraft, TAFE, Kubota, Yanmar.
 3. Experience & Qualification:
-   - Accurately parse min and max years (e.g. 5-10 -> min: 5, max: 10; 8+ -> min: 8, max: 12). Min must ALWAYS be <= max.
-   - If BE / B.Tech / BBT / Diploma / MBA is mentioned, specify in qualification.
+   - Accurately parse min and max years (e.g. 3-5 or 3–5 -> min: 3, max: 5; 8+ -> min: 8, max: 12). Min must ALWAYS be <= max.
+   - Qualifications: If Diploma or ITI is specified (e.g. "Diploma or ITI in Mechanical, Agricultural Engineering"), set qualification explicitly to "Diploma / ITI (Mechanical / Agricultural Engineering)" and DO NOT mandate B.Tech/BE!
 4. Historical Learned Feedback:
-   - High-performing keywords: [${topUpvoted || 'Rotavator, Power Tiller, Shaktiman, VST, Dealer Network, Area Sales Manager'}]
+   - High-performing keywords: [${topUpvoted || 'Power Tiller, Rotavator, VST, Shaktiman, Field Demonstration, Dealer Network'}]
    - Poor/irrelevant keywords to suppress: [${topDownvoted || 'Java, Python, Software Developer, Modern Trade'}]
 
 Return a strictly valid JSON object matching this schema:
 {
-  "title": string (Realistic job title e.g. "State Head - Farm Implements & Machinery" or "Regional Sales Manager - Farm Implements" or "HR Business Partner - Sales"),
-  "standardTitles": string[] (Realistic designations used in that market e.g. ["State Head", "Area Sales Manager", "ASM", "Regional Sales Manager", "Territory Manager"]),
+  "title": string (Realistic job title e.g. "Field Technical & Business Development Executive - Farm Machinery" or "State Head - Farm Implements"),
+  "standardTitles": string[] (Realistic designations used in that market e.g. ["Field Technical Executive", "Business Development Executive", "Territory Sales Executive", "Sales & Service Executive", "Field Service Engineer"]),
   "seniorityLevel": string ("junior" | "mid" | "senior" | "leadership"),
   "experienceYears": { "min": number, "max": number },
-  "locations": string[] (Target cities, regions or states e.g. ["Guwahati", "Assam", "Siliguri", "North East India"]),
-  "equipmentFocus": string[] (Regional equipment keywords e.g. ["Power Tiller", "Rotavator", "Farm Implements", "Weeder"]; empty [] if non-equipment/HR),
-  "targetCompanies": string[] (Competitor OEMs to poach from in that market e.g. ["VST Tillers", "Shaktiman", "Fieldking", "KisanKraft", "Mahindra", "Sonalika"]),
+  "locations": string[] (Target cities, regions or states e.g. ["West Bengal", "Kolkata", "Siliguri"]),
+  "equipmentFocus": string[] (Regional equipment keywords e.g. ["Power Tiller", "Power Weeder", "Paddy Transplanter", "Paddy Reaper", "Thresher"]; empty [] if non-equipment/HR),
+  "targetCompanies": string[] (Competitor OEMs to poach from in that market e.g. ["VST Tillers Tractors", "KisanKraft", "Kamco", "Shaktiman", "Fieldking", "Mahindra Farm Equipment", "Sonalika"]),
   "adjacentTalentPools": string[],
-  "coreCompetencies": string[] (e.g. ["SMAM DBT Subsidy", "Dealer Network Management", "Channel Sales", "Field Demonstration"]),
+  "coreCompetencies": string[] (e.g. ["Field Demonstrations", "Dealer Network Management", "After-Sales Service", "Farmer Engagement", "Paddy Mechanization"]),
   "exclusions": string[],
   "qualification": string
 }`;
 
-  // Call gemini-2.5-flash with fallback to gemini-2.0-flash with a 12s timeout
+  // Call gemini-2.5-flash with fallback to gemini-3.8-flash with a 12s timeout
   const callModelWithTimeout = async (modelName: string) => {
     return Promise.race([
       ai.models.generateContent({
@@ -137,8 +143,8 @@ Return a strictly valid JSON object matching this schema:
   try {
     response = await callModelWithTimeout('gemini-2.5-flash');
   } catch (err) {
-    console.warn('gemini-2.5-flash failed, falling back to gemini-2.0-flash:', err);
-    response = await callModelWithTimeout('gemini-2.0-flash');
+    console.warn('gemini-2.5-flash failed, falling back to gemini-3.8-flash:', err);
+    response = await callModelWithTimeout('gemini-3.8-flash');
   }
 
   const parsedJson = JSON.parse(response.text?.trim() || '{}');
@@ -151,45 +157,64 @@ function heuristicDomainParser(
 ): ParsedPosition {
   const lower = rawInput.toLowerCase();
 
+  // Explicit JD Title Header Extraction (e.g., "Job Description: Field Technical & Business Development Executive")
+  const jdHeaderMatch = rawInput.match(/(?:job description|job title|position|role overview|role|designation|title|hiring for)\s*[:–—\-]\s*([^\n\r,;|]+)/i);
+  let explicitJobTitle = jdHeaderMatch ? jdHeaderMatch[1].trim() : '';
+  if (explicitJobTitle.length > 60) {
+    explicitJobTitle = explicitJobTitle.slice(0, 60).replace(/\s+[^\s]*$/, '');
+  }
+
   // Role Category Classification
   const isHR = /\b(hr|human resource|human resources|recruiter|recruitment|talent acquisition|hrbp|people ops)\b/i.test(lower);
-  const isService = /\b(service|technical|mechanic|customer support|cse|technician)\b/i.test(lower);
+  const isTechnicalSales = /\b(business development|sales & service|technical sales|field technical|adoption|field operations)\b/i.test(lower) && 
+                           /\b(technical|service|demonstration|demonstrations|installation|support)\b/i.test(lower);
+  const isService = !isTechnicalSales && /\b(service|mechanic|customer support|cse|technician)\b/i.test(lower);
   const isOperations = /\b(plant|operations|production|manufacturing|quality|qa|qc|shop floor)\b/i.test(lower);
-
 
   // 2. Detect Locations & Regions (word boundary & prefix safe)
   const detectedLocations: string[] = [];
-  const isNorthEast = lower.includes('northeast') || lower.includes('north east') || lower.includes('north-east') || lower.includes('assam') || lower.includes('guwahati');
+  const isWestBengal = lower.includes('west bengal') || lower.includes('bengal') || lower.includes('kolkata') || lower.includes('burdwan') || lower.includes('bardhaman');
+  const isNorthEast = !isWestBengal && (lower.includes('northeast') || lower.includes('north east') || lower.includes('north-east') || lower.includes('assam') || lower.includes('guwahati'));
+
+  if (isWestBengal) {
+    detectedLocations.push('West Bengal', 'Kolkata');
+    if (lower.includes('siliguri')) detectedLocations.push('Siliguri');
+    if (lower.includes('burdwan') || lower.includes('bardhaman')) detectedLocations.push('Burdwan');
+  }
 
   for (const region of TRACTOR_IMPLEMENTS_KNOWLEDGE.indianAgriStatesAndHubs) {
-    // If requirement asks for Northeast, do NOT let North India or East India falsely match
-    if ((region.region === 'North India' || region.region === 'East India') && isNorthEast) {
+    // If requirement is West Bengal, do NOT match West India or North East
+    if (isWestBengal && (region.region === 'West India' || region.region === 'North East India')) {
+      continue;
+    }
+    // If requirement asks for Northeast, do NOT let North India falsely match
+    if (isNorthEast && region.region === 'North India') {
       continue;
     }
 
-    if (region.aliases) {
-      for (const alias of region.aliases) {
-        const regex = new RegExp(`(^|\\s|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-z0-9])`, 'i');
-        if (regex.test(lower)) {
-          detectedLocations.push(region.region);
-          if (region.states.length > 0) detectedLocations.push(region.states[0]);
-          if (region.majorHubs.length > 0) detectedLocations.push(region.majorHubs[0]);
-          break;
-        }
-      }
-    }
-    // Check individual states
+    // Check states first
     for (const state of region.states) {
       const stateRegex = new RegExp(`(^|\\s|[^a-z0-9])${state.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-z0-9])`, 'i');
-      if (stateRegex.test(lower) || lower.includes(state.toLowerCase())) {
+      if (stateRegex.test(lower)) {
         detectedLocations.push(state);
       }
     }
     // Check hubs
     for (const hub of region.majorHubs) {
       const hubRegex = new RegExp(`(^|\\s|[^a-z0-9])${hub.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-z0-9])`, 'i');
-      if (hubRegex.test(lower) || lower.includes(hub.toLowerCase())) {
+      if (hubRegex.test(lower)) {
         detectedLocations.push(hub);
+      }
+    }
+    // Check aliases with strict token match
+    if (region.aliases) {
+      for (const alias of region.aliases) {
+        const regex = new RegExp(`(^|\\s|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[^a-z0-9])`, 'i');
+        if (regex.test(lower)) {
+          detectedLocations.push(region.region);
+          if (region.states.length > 0 && !isWestBengal) detectedLocations.push(region.states[0]);
+          break;
+        }
       }
     }
   }
@@ -245,7 +270,33 @@ function heuristicDomainParser(
         'Subsidy & DBT Documentation',
       ];
 
-  if (isHR) {
+  if (explicitJobTitle) {
+    detectedTitle = explicitJobTitle;
+    if (isTechnicalSales) {
+      matchedTitles = [
+        'Field Technical Executive',
+        'Business Development Executive',
+        'Territory Sales Executive',
+        'Sales & Service Executive',
+        'Field Service Engineer',
+        'Field Sales Engineer',
+      ];
+      coreCompetencies = [
+        'Field Demonstration',
+        'Farmer Engagement',
+        'Dealer Management',
+        'Machinery Installation & Commissioning',
+        'After Sales Support',
+      ];
+    } else {
+      matchedTitles = [
+        'Territory Manager',
+        'Area Sales Manager',
+        'ASM',
+        'Sales Executive',
+      ];
+    }
+  } else if (isHR) {
     if (lower.includes('sales')) {
       detectedTitle = 'HR Business Partner - Sales';
       matchedTitles = ['Sales HR Manager', 'HR Business Partner - Sales', 'Regional HR Manager', 'Talent Acquisition Specialist - Sales', 'HRBP'];
@@ -262,6 +313,23 @@ function heuristicDomainParser(
       'Performance Management',
       'HR Operations',
       'Field Staff Retention',
+    ];
+  } else if (isTechnicalSales) {
+    detectedTitle = 'Field Technical & Business Development Executive';
+    matchedTitles = [
+      'Field Technical Executive',
+      'Business Development Executive',
+      'Territory Sales Executive',
+      'Sales & Service Executive',
+      'Field Service Engineer',
+      'Field Sales Engineer',
+    ];
+    coreCompetencies = [
+      'Field Demonstration',
+      'Farmer Engagement',
+      'Dealer Management',
+      'Machinery Installation & Commissioning',
+      'After Sales Support',
     ];
   } else if (isService) {
     detectedTitle = 'Customer Service Engineer';
@@ -301,11 +369,11 @@ function heuristicDomainParser(
     seniority = 'mid';
   }
 
-  // 4. Experience Years Extraction - robust handling for ranges and single numbers
+  // 4. Experience Years Extraction - robust handling for ranges and single numbers (including unicode dashes – and —)
   let expMin = 3;
   let expMax = 7;
 
-  const rangeMatch = lower.match(/(\d+)\s*(?:-|to|se|\/)\s*(\d+)\s*(?:years|yrs|saal|sal)/i);
+  const rangeMatch = lower.match(/(\d+)\s*(?:-|–|—|to|se|\/)\s*(\d+)\s*(?:years|yrs|saal|sal)/i);
   const singleMatch = lower.match(/(\d+)\+?\s*(?:years|yrs|saal|sal|of experience|years of experience)/i);
 
   if (rangeMatch) {
@@ -392,13 +460,18 @@ function heuristicDomainParser(
       ];
 
   let qualification: string | undefined = undefined;
-  // Check degree/education mention (e.g. BE / B.Tech / BBT)
-  if (lower.includes('b.tech') || lower.includes('b tech') || lower.includes('be') || lower.includes('bbt') || lower.includes('engineering')) {
+  // Check degree/education mention - Check Diploma / ITI first
+  if (/\b(iti|diploma)\b/i.test(lower)) {
+    if (/\b(degree|b\.?tech|be)\b/i.test(lower)) {
+      qualification = 'Diploma or Degree in Agricultural / Mechanical Engineering';
+      coreCompetencies.unshift('Diploma / Degree');
+    } else {
+      qualification = 'Diploma or ITI in Mechanical / Agricultural Engineering / Automobile';
+      coreCompetencies.unshift('Diploma / ITI');
+    }
+  } else if (lower.includes('b.tech') || lower.includes('b tech') || lower.includes('be') || lower.includes('bbt') || lower.includes('engineering')) {
     qualification = 'BE / B.Tech (Agri / Mechanical / Engineering)';
     coreCompetencies.unshift('BE / B.Tech');
-  } else if (lower.includes('diploma')) {
-    qualification = 'Diploma (Agri / Mechanical Engineering)';
-    coreCompetencies.unshift('Diploma (Mechanical / Agri)');
   } else if (lower.includes('mba') || lower.includes('msw')) {
     qualification = 'MBA / MSW (Human Resources)';
     coreCompetencies.unshift('MBA / MSW (HR)');
@@ -420,7 +493,9 @@ function heuristicDomainParser(
     ? ['IT Recruitment', 'Software Developer', 'Java', 'Python', 'DevOps', 'Call Center']
     : [...TRACTOR_IMPLEMENTS_KNOWLEDGE.standardExclusions];
 
-  const titleSuffix = detectedEquipment.length > 0 ? ` - ${detectedEquipment[0]}` : (isHR ? '' : ' - Farm Implements');
+  const titleSuffix = explicitJobTitle
+    ? ''
+    : (detectedEquipment.length > 0 ? ` - ${detectedEquipment[0]}` : (isHR ? '' : ' - Farm Implements'));
 
   return {
     title: `${detectedTitle}${titleSuffix}`,
